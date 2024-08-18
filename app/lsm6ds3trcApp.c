@@ -13,9 +13,8 @@
 #include <fcntl.h>
 #include "lsm6ds3trcApp.h"
 #include "math.h"
-// #include <bits/mathcalls.h>
 
-#define Kp 		50.0f				/* 决定加速度计收敛速度 */
+#define Kp 		300.0f				/* 决定加速度计收敛速度 */
 #define Ki 		0.02f				/* 决定陀螺仪偏差的收敛速度 */
 #define halfT	1.0f/(2*833.0f)		/* 833HZ */
 #define dt		1.0f/833.0f			/* 833HZ对应周期 */
@@ -80,15 +79,10 @@ int main(int argc, char *argv[])
 			dec_acc_y = complementToOriginal(acc_y_reg);
 			dec_acc_z = complementToOriginal(acc_z_reg);
 
-			// printf("acc_regx:%d, y = %d, z = %d\r\n", acc_x_reg, acc_y_reg, acc_z_reg);
-			// printf("acc_dec x:%d, y = %d, z = %d\r\n", dec_acc_x, dec_acc_y, dec_acc_z);
-
 			/* 灵敏度转换 */
 			acc_x = ((float)dec_acc_x * ACC_FSXL_2G_scale)/1000;	/* 单位g */
 			acc_y = ((float)dec_acc_y * ACC_FSXL_2G_scale)/1000;
 			acc_z = ((float)dec_acc_z * ACC_FSXL_2G_scale)/1000;
-
-			//printf("Acc: X = %f, Y = %f, Z = %f\r\n", acc_x, acc_y, acc_z);
 
 			/* 角速度raw数据 */
 			gyr_x_reg = (databuf[7] << 8) | databuf[6];
@@ -105,22 +99,14 @@ int main(int argc, char *argv[])
 			gyr_y = ((float)dec_gyr_y * GYR_FSG_245_scale)/1000;
 			gyr_z = ((float)dec_gyr_z * GYR_FSG_245_scale)/1000;
 
-			//printf("gyr: X = %f, Y = %f, Z = %f\r\n", acc_x, acc_y, acc_z);
-
 			/* 温度数据 */
 			temp_reg = (databuf[13] << 8) | databuf[12];
 			dec_temp = complementToOriginal(temp_reg);
 
 			temp = ((float)dec_temp / 256.0) + 25.0;
 
-			/* 输出原始数据 */
-			// printf("Acc: X = %.2f, Y = %.2f, Z = %.2f,\t\t Gyr: X = %.2f,\t Y = %.2f,\t Z = %.2f\r\n", 
-			//  		acc_x, acc_y, acc_z, gyr_x, gyr_y, gyr_z);
-
 			/* 姿态解算 */
 			IMUupdate(gyr_x, gyr_y, gyr_z, acc_x, acc_y, acc_z);
-			/* 姿态输出 */
-			// printf("Pitch = %.2f,\t\t Roll = %.2f,\t\t Yaw = %.2f\r\n", Pitch, Roll, Yaw);
 			printf("Pitch = %f,\t\t\t Roll = %f\t\t\t Yaw = %f\r\n", Pitch, Roll, Yaw);
 		}	
 		//usleep(10000);	/* 50ms */
@@ -153,22 +139,16 @@ void IMUupdate(float gx, float gy, float gz, float ax, float ay, float az)
 	ay = ay / norm;
 	az = az / norm;
 
-	//printf("ax = %f, ay = %f, az = %f\r\n", ax, ay, az);
-
 	/* */
 	/* 四元数表示三轴的重力分量 */
 	vx = 2*(q1*q3 - q0*q2);
 	vy = 2*(q0*q1 + q2*q3);
 	vz = q0*q0 - q1*q1 - q2*q2 + q3*q3;
 
-	//printf("vx = %f, vy = %f, vz = %f\r\n", vx, vy, vz);
-
 	/* 求 “四元数所求的重力分量” 与 “加速度计测量值的误差 ” */
 	ex = (ay*vz - az*vy);
 	ey = (az*vx - ax*vz);
 	ez = (ax*vy - ay*vx);
-
-	//printf("ex = %f, ey = %f, ez = %f\r\n", ex, ey, ez);
 
 	/* 修正陀螺仪测量值 */
 	exInt = exInt + ex*Ki;
@@ -192,8 +172,6 @@ void IMUupdate(float gx, float gy, float gz, float ax, float ay, float az)
 	q1 = q1 / norm;
 	q2 = q2 / norm;
 	q3 = q3 / norm;
-
-	// Yaw = (180.0f/pi)*atan2(2*(q1*q2 + q0*q3), q0*q0+q1*q1+q2*q2+q3*q3); 			// 偏航角
 
 	/* 绕zyx顺序旋转 */
 	Roll_zyx = (180.0f/pi)*asin(-2*(q1*q3-q0*q2)); 										// 绕y轴旋转	
